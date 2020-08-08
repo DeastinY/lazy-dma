@@ -1,5 +1,10 @@
+import time
+import soco
+import pyaudio
+from phue import Bridge
+
 from dataclasses import dataclass, asdict
-from flask import Flask, jsonify
+from flask import Flask, Response
 from flask_restful import reqparse, Resource, Api
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
@@ -10,10 +15,17 @@ CORS(app)
 db = SQLAlchemy(app)
 api = Api(app)
 
+bridge = Bridge("192.168.178.33")
+bridge.connect()
+LIGHTS = ["Ceiling", "Desk Richard", "Desk Spot"]
+
+device = soco.discovery.any_soco()
+zone = device.group.coordinator
+
 @dataclass
 class Scene(db.Model):
     id: int = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    name: str = db.Column(db.String(60), unique=True, nullable=False)
+    name: str = db.Column(db.String(20), unique=True, nullable=False)
     description: str = db.Column(db.String(120), unique=False, nullable=True)
 
 
@@ -100,6 +112,15 @@ class SceneSingle(Resource):
         db.session.commit()
 
 
+class ActivateScene(Resource):
+    def post(self, scene_id):
+        bridge.set_light(LIGHTS, "on", False)
+        time.sleep(1)
+        bridge.set_light(LIGHTS, "on", True)
+        zone.play_uri("https://bigsoundbank.com/UPLOAD/mp3/1631.mp3")
+        return 202
+
+
 class SoundList(Resource):
     def get(self):
         return [asdict(s) for s in Sound.query.all()]
@@ -129,6 +150,18 @@ class SoundSingle(Resource):
         db.session.commit()
 
 
+@app.route("/audio")
+def audio():
+    def generate():
+        with open("sounds/test.mp3", "rb") as f:
+            data = f.read(1024)
+            while data:
+                yield data
+                data = f.read(1024)
+
+    return Response(generate(), mimetype="audio/x-wav")
+
+
 api.add_resource(SceneList, "/scenes")
 api.add_resource(SceneSingle, "/scenes/<string:scene_id>")
 
@@ -137,6 +170,8 @@ api.add_resource(LightSingle, "/lights/<string:light_id>")
 
 api.add_resource(SoundList, "/sounds")
 api.add_resource(SoundSingle, "/sounds/<string:sound_id>")
+
+api.add_resource(ActivateScene, "/scenes/<string:scene_id>/activate")
 
 if __name__ == '__main__':
     app.run(debug=True, host="0.0.0.0")
