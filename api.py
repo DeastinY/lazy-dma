@@ -17,7 +17,7 @@ api = Api(app)
 
 bridge = Bridge("192.168.178.33")
 bridge.connect()
-LIGHTS = ["Ceiling", "Desk Richard", "Desk Spot"]
+LAMPS = ["Ceiling", "Desk Richard", "Desk Spot"]
 
 device = soco.discovery.any_soco()
 zone = device.group.coordinator
@@ -114,9 +114,9 @@ class SceneSingle(Resource):
 
 class ActivateScene(Resource):
     def post(self, scene_id):
-        bridge.set_light(LIGHTS, "on", False)
+        bridge.set_light(LAMPS, "on", False)
         time.sleep(1)
-        bridge.set_light(LIGHTS, "on", True)
+        bridge.set_light(LAMPS, "on", True)
         zone.play_uri("https://bigsoundbank.com/UPLOAD/mp3/1631.mp3")
         return 202
 
@@ -150,6 +150,11 @@ class SoundSingle(Resource):
         db.session.commit()
 
 
+class LampList(Resource):
+    def get(self):
+        return [bridge.get_light(l) for l in LAMPS]
+
+
 @app.route("/audio")
 def audio():
     def generate():
@@ -161,6 +166,8 @@ def audio():
 
     return Response(generate(), mimetype="audio/x-wav")
 
+
+api.add_resource(LampList, "/lamps")
 
 api.add_resource(SceneList, "/scenes")
 api.add_resource(SceneSingle, "/scenes/<string:scene_id>")
